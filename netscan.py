@@ -3,6 +3,7 @@ import threading
 import multiprocessing
 import ipcalc
 import logging
+import time
 
 
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
@@ -85,11 +86,15 @@ class Host():
 class Menu():
     def __init__(self):
         self.hostlist = []
-        
+        self.current = None
+
+    #add host menu items
+
     def add_host(self, ip, test=False):
         i = Host(ip)
-        if test and i.up:
-            self.hostlist.append(i)
+        if test:
+            if i.up:
+                self.hostlist.append(i)
         else:
             self.hostlist.append(i)
 
@@ -104,20 +109,28 @@ class Menu():
             t = threading.Thread(target=self.add_host, args=(str(i), scan, ))
             t.start()
 
+    # drop host menu items
+
     def drop_host(self, host):
         self.hostlist.remove(host)
     
     def drop_down(self):
         self.hostlist = list(set(self.hostlist) - set([h for h in self.hostlist if not h.up]))
 
-    
+    # scan host menu items
+
     def scan_host(self, host, tpe="well_known"):
-        host.port_scan(tpe)
+        h = self.hostlist.pop(self.hostlist.index(host))
+        h.port_scan(tpe)
+        time.sleep(20)
+        self.hostlist.append(h)
     
     def scan_all(self, tpe="quick"):
         for i in self.hostlist:
-            p = multiprocessing.Process(target=i.port_scan, args=(tpe,))
-            p.start()
+            t = threading.Thread(target=i.port_scan, args=(tpe,))
+            t.start()
+
+    # show info menu Items 
 
     def show_host(self, host):
         ''' Display all the info for a particular host'''
@@ -139,6 +152,8 @@ class Menu():
                     i.show_info()
                 else:
                     print "[] {}".format(i.ip)
+    
+    # cli use
 
     def get_host(self, iput):
         ''' Takes either the IP address or the ID and returns the host object '''
@@ -148,14 +163,127 @@ class Menu():
             elif i.ip == iput:
                 return i
 
-    def banner(self):
-        print "soon"
+    def main_menu(self):
+        print "# Netscan.py #"
+        print "1. Add hosts"
+        print "2. Set current host( {} )".format(self.current)
+        print "3. list hosts"
+        print "4. Scan hosts"
+        print "5. Delete hosts"
+        print "6. Change current host"
+        print "7. Exit"
+        i = int(raw_input(">>: "))
+        print i
+        if i == 1:
+            self.add_menu()
+        elif i == 2:
+            self.cur_host_menu()
+        elif i == 3:
+            self.list_menu()
+        elif i == 4:
+            self.scan_menu()
+        elif i == 5:
+            self.delete_menu()
+        elif i == 6:
+            self.cur_host_menu(True)
+        elif i == 7:
+            exit(1)
+
+
+    def add_menu(self):
+        print "# Add a host #"
+        print "1. Add a single host"
+        print "2. Add a Network"
+        print "3. Scan a network and add only hosts that are up"
+        print "0. Return to main menu"
+        i = int(raw_input(">>: "))
+        if i == 1:
+            print "Enter the IPv4 address"
+            ip = raw_input(">>: ")
+            self.add_host(ip)
+        elif i == 2:
+            print "Enter the Network address"
+            ip = raw_input('>>: ')
+            print "Enter the cidr"
+            cdr = raw_input('>>: ')
+            self.add_net(ip, cdr)
+        elif i == 3:
+            print "Enter the Network address"
+            ip = raw_input('>>: ')
+            print "Enter the cidr"
+            cdr = raw_input('>>: ')
+            self.scan_net(ip, cdr)
+        self.main_menu()
+
+    def cur_host_menu(self, reset=False):
+        if self.current is None or reset:
+            print "# Set a host as your curent Host #"
+            self.show_all(False)
+            print "Enter the host ip or name"
+            i = raw_input(">>: ")
+            self.current = self.get_host(i)
+        print "1. Port scan current host"
+        print "2. Current host info"
+        self.main_menu()
+        
+    
+    def scan_menu(self):
+        print "# Port Scanning #"
+        print "1. Scan current Host"
+        print "2. Scan a Host"
+        print "3. Scan all Hosts"
+        print "0. Return to main menu"
+        i = int(raw_input(">>: "))
+        if i == 1:
+            self.scan_host(self.current)
+        elif i == 2:
+            print "Enter the host name or ip to scan"
+            addr = raw_input(">>: ")
+            self.scan_host(self, self.get_host(addr))
+        elif i == 3:
+            self.scan_all()
+        self.main_menu()
+
+    def delete_menu(self):
+        print "# Delete Menu #"
+        print "1. Delete Down Hosts"
+        print "2. Delete all hosts"
+        print "3. Delete single host"
+        print "0. Return to main menu"
+        i = int(raw_input(">>: "))
+        if i == 1:
+            self.drop_down()
+        elif i == 2:
+            self.hostlist = []
+        elif i == 3:
+            print "Enter the name or address to delete"
+            addr = raw_input(">>: ")
+            self.drop_host(self.get_host(addr))
+        self.main_menu()
+    
+    def list_menu(self):
+        print "# Listing menu #"
+        print "1. List all"
+        print "2. List hosts that are up"
+        print "3. List single host info"
+        print "0. Return to main menu"
+        i = int(raw_input(">>: "))
+        if i == 1:
+            self.show_all()
+        elif i == 2:
+            self.show_up()
+        elif i == 3:
+            print "Enter the name or address to show info"
+            addr = raw_input(">>: ")
+            self.show_info(self.get_host(addr))
+        self.main_menu()
+          
+            
 
 
 m = Menu()
 
-m.add_net('10.0.2.1', 28)
-print "===Starting==="
         
 import pdir as dir
-
+if __name__  == "__main__":
+    m.main_menu()
